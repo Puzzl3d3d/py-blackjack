@@ -139,6 +139,7 @@ class Hand:
 from urllib import request, parse
 import json
 
+# if you wanna bomb the api, add "jared_" before it (e.g. "/blackjack/jared_data") please :)
 base_url = "https://flask.puzzl3d.dev"
 api = "/blackjack"
 data_endpoint = "/data"
