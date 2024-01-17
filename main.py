@@ -21,8 +21,8 @@ results = {
 def clear():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def get_leaderboard():
-    data = leaderboard.get() or {}
+def get_top():
+    data = leaderboard.get_top() or {}
     name = data.get("name", "Nobody")
     value = data.get("value", 0)
     if money > value:
@@ -30,11 +30,18 @@ def get_leaderboard():
         name = user
         value = money
     return name, value
+def get_self_pos():
+    data = leaderboard.get_data()
+    sorted_data = sorted(data.keys(), key=lambda x: (-data[x].get("highest", 100), data[x].get("last_updated", 0)))
+    position = sorted_data.index(user) + 1
+    print(f"Your position in the leaderboard is {leaderboard.ordinal_suffix(position)} with ${data.get(user, {}).get("highest", 100)}!")
+    return position, sorted_data
 
 def get_bet():
-    clear()
-    name,value = get_leaderboard()
+    name,value = get_top()
     print(f"{name} is top of the leaderboard with ${value}!")
+    get_self_pos()
+    print
     while True:
         try:
             bet = int(input(f"What's your bet (You have ${money})? "))
@@ -161,8 +168,10 @@ if __name__ == "__main__":
 
             money += bet*results[result]
 
-            print("-"*15)
+            print()
             print(f"{result}! You now have ${money}")
+
+            print("-"*15)
 
             if money <= 0:
                 break
