@@ -236,8 +236,11 @@ def get_top():
 def get_self_pos():
     data = leaderboard.get_data()
     sorted_data = sorted(data.keys(), key=lambda x: (-data[x].get("highest", 100), data[x].get("last_updated", 0)))
-    position = sorted_data.index(user) + 1
-    print(f"Your position in the leaderboard is {leaderboard.ordinal_suffix(position)} with ${data.get(user, {}).get("highest", 100)}!")
+    try:
+        position = sorted_data.index(user) + 1
+        print(f"Your position in the leaderboard is {leaderboard.ordinal_suffix(position)} with ${data.get(user, {}).get('highest', 100)}!")
+    except:
+        print(f"You aren't on the leaderboard yet!")
     return position, sorted_data
 
 def get_bet():
