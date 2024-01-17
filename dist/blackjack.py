@@ -241,6 +241,7 @@ def get_self_pos():
         print(f"Your position in the leaderboard is {leaderboard.ordinal_suffix(position)} with ${data.get(user, {}).get('highest', 100)}!")
     except:
         print(f"You aren't on the leaderboard yet!")
+        return None, sorted_data
     return position, sorted_data
 
 def get_bet():
