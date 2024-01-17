@@ -2,8 +2,9 @@ from urllib import request, parse
 import json
 import os
 
-base_url = "http://127.0.0.1:5000"#https://flask.puzzl3d.dev"
+base_url = "https://flask.puzzl3d.dev"
 api = "/blackjack"
+# if you wanna bomb the api, add "jared_" before it (e.g. "/blackjack/jared_data") please :)
 data_endpoint = "/data"
 top_endpoint = "/top"
 
