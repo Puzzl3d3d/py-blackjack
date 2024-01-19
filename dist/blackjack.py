@@ -1,11 +1,15 @@
 # DECK
 from random import shuffle
+
 SUITS = ("Diamonds", "Hearts", "Spades", "Clubs")
 CARDS = ("A", 2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K")
+
+# Generate a deck
 DECK = []
 for suit in SUITS:
     for card in CARDS:
         DECK.append([suit, card])
+
 class Deck:
     def __init__(self, shoe_size=6):
         self.shoe = []
@@ -29,32 +33,29 @@ class Deck:
         self.discards.append(card)
         return card
 
-
 # CARD RENDERER
 import os
 
 os.system('' if os.name == 'nt' else 'color')
 os.system('cls' if os.name == 'nt' else 'clear')
 
-card = """
-┌────────┐
+card = """┌────────┐
 │ {:<2}   {} │
 │        │
 │        │
 │        │
 │ {}   {:>2} │
-└────────┘
-"""
+└────────┘"""
 
 suitColours = {
-    "Hearts": "\033[91m{}\033[00m",
-    "Diamonds": "\033[91m{}\033[00m",
-    "Clubs": "{}",
-    "Spades": "{}"
+    "Hearts": "\033[91m{}{}\033[00m",
+    "Diamonds": "\033[91m{}{}\033[00m",
+    "Clubs": "{}{}\033[00m",
+    "Spades": "{}{}\033[00m"
 }
 suitEmojis = {"Hearts": "♥", "Clubs": "♣", "Diamonds": "♦", "Spades": "♠"}
 
-def combineStrings(str1, str2, *args, spacing="  ", suit1="Spades", suit2="Spades"):
+def combineStrings(str1, str2, *args, spacing="  ", suit1="Spades", suit2="Spades", bg=""):
     combined = ""
     str1 = str1.split("\n")
     str2 = str2.split("\n")
@@ -62,38 +63,42 @@ def combineStrings(str1, str2, *args, spacing="  ", suit1="Spades", suit2="Spade
     for i in range(max(len(str1), len(str2))):
         line1 = str1[i] if i < len(str1) else ""
         line2 = str2[i] if i < len(str2) else ""
-        combined += f"{suitColours[suit1].format(line1)}{spacing}{suitColours[suit2].format(line2)}\n"
+        combined += f"{suitColours[suit1].format(bg, line1)}{spacing}{suitColours[suit2].format(bg, line2)}\n"
     return combined
 
 def getCardDisplay(suit, value):
     if suit is None or value is None:
-        card_back = """
-┌────────┐
+        card_back = f"""┌────────┐
 │╱╲╱╲╱╲╱╲│
 │╲╱╲╱╲╱╲╱│
 │        │
 │╱╲╱╲╱╲╱╲│
 │╲╱╲╱╲╱╲╱│
-└────────┘
-"""
+└────────┘"""
         return card_back
     else:
         value_str = {10: "10", 11: "A", 12: "J", 13: "Q", 14: "K"}.get(value, str(value))
         suitEmoji = suitEmojis[suit]
-        return suitColours[suit].format(card.format(value_str, suitEmoji, suitEmoji, value_str))
+        return suitColours[suit].format("",card.format(value_str, suitEmoji, suitEmoji, value_str))
+    
 
 
 # HAND
 class Hand:
     def __init__(self):
         self.hand = []
+        self.stood = False
+        self.result = None
+        self.bg = ""
     def __str__(self):
-        combined = "\n\n\n\n\n\n\n\n"
+        bg = self.bg or ""
+        combined = "\n"*7
         for card in self.hand:
             if card == []:
-                combined = combineStrings(combined, getCardDisplay(None, None), suit2="Spades") # default as spades for no reason whatsoever
+                combined = combineStrings(combined, getCardDisplay(None, None), suit2="Spades", bg=bg) # default as spades for no reason whatsoever
             else:
-                combined = combineStrings(combined, getCardDisplay(*card), suit2=card[0])
+                combined = combineStrings(combined, getCardDisplay(*card), suit2=card[0], bg=bg)
+
         return combined
     def __int__(self):
         return self.calculate()
@@ -132,9 +137,7 @@ class Hand:
         return card1[1] == card2[1] or (isinstance(card1[1], str) and isinstance(card2[1], str))
     def split(self):
         if self.can_split():
-            return Hand().add_card(self.hand[0]), Hand().add_card(self.hand[-1])
-
-
+            return len(self.hand) == 2 and Hand().add_card(self.hand[0]), Hand().add_card(self.hand[-1])
 # LEADERBOARD
 from urllib import request, parse
 import json
@@ -205,11 +208,14 @@ class leaderboard:
             suffix = suffixes.get(position % 10, 'th')
         return f"{position}{suffix}"
 
-money = 100
+import time
+
+cooldown = 60
 user = leaderboard.get_user()
 
 dealerHand = Hand()
-playerHand = Hand()
+playerHands = [Hand()]
+currentPlayerHand = 0
 shoe = Deck(shoe_size=6)
 shoe.shuffle()
 
@@ -267,7 +273,10 @@ def get_choice():
 
     choices = {"Hit": "h", "Stand": "s"}
     if money >= bet*2: choices["Double Down"] = "d"
-    if playerHand.can_split(): choices["Split"] = "p"
+    if playerHands[currentPlayerHand].can_split() and money >= bet*2: choices["Split"] = "p"
+    if len(playerHands) > 1:
+        choices["Next hand"] = "e"
+        choices["Previous hand"] = "q"
 
     print("Pick a choice:")
     for name in choices:
@@ -292,26 +301,58 @@ def dealer():
     while dealerHand.calculate() < 17:
         dealerHand.add_card(shoe.draw())
 
+LOCKED_BG = "\033[100m"
+SELECTED_BG = "\033[104m"
+
 def displayHands():
     clear()
     print(f"This game is worth ${bet}")
     print()
     print("You:")
-    print(playerHand)
-    print(f"Value: {playerHand.calculate()}")
+    for hand in playerHands:
+        if len(playerHands) > 1 and playerHands[currentPlayerHand] == hand:
+            hand.bg = SELECTED_BG
+        elif len(playerHands) > 1 and hand.stood or hand.result:
+            hand.bg = LOCKED_BG
+        else:
+            hand.bg = ""
+        print(hand)
+        print(f"Value: {hand.calculate()}")
+        print()
+        print()
     print()
     print("Dealer:")
     print(dealerHand)
     print(f"Value: {dealerHand.calculate()}")
 
-def round():
+def get_result(playerHand):
+    if playerHand.result: return                                  playerHand.result
+    elif playerHand.calculate() > 21: return                      "Bust"
+    elif dealerHand.calculate() > 21: return                      "Win"
+    elif playerHand.calculate() == dealerHand.calculate(): return "Push"
+    elif playerHand.calculate() > dealerHand.calculate(): return  "Win"
+    else: return                                                  "Lose"
+
+def increment_hand_index(increment):
+    global currentPlayerHand
+    if increment > 0:
+        for i in range(len(playerHands)):
+            currentPlayerHand = currentPlayerHand+1 if currentPlayerHand < len(playerHands)-1 else 0
+            if not playerHands[currentPlayerHand].result and not playerHands[currentPlayerHand].stood: break
+    else:
+        for i in range(len(playerHands)):
+            currentPlayerHand = currentPlayerHand-1 if currentPlayerHand > 0 else len(playerHands)-1
+            if not  playerHands[currentPlayerHand].result and not playerHands[currentPlayerHand].stood: break
+def doRound():
     global bet, money
-    global playerHand, dealerHand
+    global playerHands, currentPlayerHand, dealerHand
 
     bet = get_bet()
 
     # Initialise the hands
-    playerHand.reset()
+    playerHands = [Hand()]
+    currentPlayerHand = 0
+    playerHand = playerHands[currentPlayerHand]
     dealerHand.reset()
 
     playerHand.add_card(shoe.draw())
@@ -322,69 +363,137 @@ def round():
     dealerHand.hidden_card = shoe.draw()
 
     # Check for dealer blackjack
-    if Hand().add_card(dealerHand.hand[0]).add_card(dealerHand.hidden_card) == 21:
+    if Hand().add_card(dealerHand.hand[0]).add_card(dealerHand.hidden_card).calculate() == 21:
         # Check for player blackjack
         if playerHand.calculate() == 21:
-            return "Push"
+            playerHand.result = "Push"
         else:
-            return "Lose"
+            playerHand.result = "Lose"
+        return
     # Check for player blackjack
     elif playerHand.calculate() == 21:
-        return "Blackjack"
+        playerHand.result = "Blackjack"
+        return
 
     while True:
+        if len(playerHands) == 1 and (playerHands[0].calculate() >= 21 or playerHands[0].result or playerHands[0].stood): break
+        if len(playerHands) > 1:
+            numEnded = 0
+            for playerHand in playerHands:
+                if playerHand.result or playerHand.stood or playerHand.calculate() >= 21:
+                    numEnded += 1
+                    playerHand.stood = True
+                    if playerHand.calculate() == 21 and len(playerHand.hand) == 2:
+                        playerHand.result = "Blackjack"
+            if numEnded == len(playerHands):
+                break
         displayHands()
-        if playerHand.calculate() >= 21: break
+
         choice = get_choice()
+        playerHand = playerHands[currentPlayerHand]
+
+        if choice == "e":
+            increment_hand_index(1)
+        if choice == "q":
+            increment_hand_index(-1)
+
         if choice == "s": # Stand
-            break
+            if len(playerHands) == 1: break
+            playerHand.stood = True
+            continue
         
         if choice == "p" and playerHand.can_split(): # Split
-            print("Not added that yet lmao")
+            original_bet = bet / len(playerHands)
+            bet += original_bet
+
+            hand1, hand2 = playerHand.split()
+            hand1.add_card(shoe.draw())
+            hand2.add_card(shoe.draw())
+            playerHands[currentPlayerHand] = hand1
+            playerHands.append(hand2)
+
             continue
 
-        if choice == "d": bet *= 2 # Double down
+        if choice == "d": # Double down
+            original_bet = bet / len(playerHands)
+            bet += original_bet
+            playerHand.stood = True
         if choice == "h" or choice == "d": # Hit / Double down
             playerHand.add_card(shoe.draw())
-            if choice == "d": break
     
     displayHands()
     
-    if playerHand.calculate() > 21:
-        return "Bust"
+    numLosses = 0
+    for playerHand in playerHands:
+        if playerHand.calculate() > 21:
+            playerHand.result = "Bust"
+            numLosses += 1
+        elif playerHand.calculate() == 21 and len(playerHand.hand) == 2:
+            playerHand.result = "Blackjack"
+    if numLosses == len(playerHands):
+        return
     
     dealer()
 
     displayHands()
 
-    if dealerHand.calculate() > 21:
-        return "Win"
-    if playerHand.calculate() == dealerHand.calculate():
-        return "Push"
-    elif playerHand.calculate() > dealerHand.calculate():
-        return "Win"
-    else:
-        return "Lose"
+    for playerHand in playerHands:
+        playerHand.result = get_result(playerHand)
     
 if __name__ == "__main__":
-    while True:
+    data = leaderboard.get_self_data()
+    money = data.get("current", 100)
+    delta = time.time() - data.get("last_updated", 0)
+    if money == 0 and delta > cooldown:
         money = 100
-
+        leaderboard.update(money)
+    elif money == 0:
         while True:
-            result = round()
+            clear()
+            delta = time.time() - data.get("last_updated", 0)
+            if delta > cooldown: break
+            else: print(f"You ran out of money! Play again in {round(cooldown-delta)} seconds")
+            time.sleep(0.5)
+        money = 100
+        leaderboard.update(money)
 
-            money += bet*results[result]
+    while True:
+        while True:
+            doRound()
+            original_bet = bet / len(playerHands)
+
+            for playerHand in playerHands:
+                result = playerHand.result or "Push" # default to draw
+                money += original_bet*results[result]
+
+            leaderboard.update(money)
 
             print()
-            print(f"{result}! You now have ${money}")
+            if len(playerHands) == 1:
+                print(f"{result}! You now have ${money}")
+            else:
+                i = 1
+                total_result = 0
+                for playerHand in playerHands:
+                    return_amount = results[playerHand.result]
+                    print(f"Hand {i} | {playerHand.result}! You {"kept" if return_amount==0 else ("lost" if return_amount < 0 else "gained")} ${abs(original_bet*return_amount)}!")
+                    total_result += original_bet*return_amount
+                    i += 1
+                print(f"Overall, you {"kept" if total_result==0 else ("lost" if total_result < 0 else "gained")} ${abs(total_result)} and now have ${money}!")
 
             print("-"*15)
 
             if money <= 0:
                 break
 
-        play_again = input("You ran out of money! Play again? ")
-        if len(play_again) > 0 and play_again.lower()[0] == "n": break
-        clear()
-
-    print("See you again!")
+        print(f"You ran out of money! Play again in {cooldown} seconds")
+        start = time.time()
+        time.sleep(1)
+        while True:
+            clear()
+            delta = time.time() - start
+            if delta > cooldown: break
+            else: print(f"{round(cooldown-delta)} seconds left!", end="")
+            time.sleep(0.5)
+        money = 100
+        leaderboard.update(money)
