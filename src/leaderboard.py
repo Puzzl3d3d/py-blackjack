@@ -35,7 +35,7 @@ def get_data():
             charset = response.headers.get_content_charset()
             return json.loads(response.read().decode(charset or 'utf-8'))
     except Exception as e:
-        return f"An error occurred: {e}"
+        return {}
 def get_self_data():
     query_params = parse.urlencode({'name': username or get_user()})
     try:
@@ -43,7 +43,7 @@ def get_self_data():
             charset = response.headers.get_content_charset()
             return json.loads(response.read().decode(charset or 'utf-8'))
     except Exception as e:
-        return f"An error occurred: {e}"
+        return {}
 def update(value):
     query_params = parse.urlencode({'name': username or get_user(), 'value': value})
     req = request.Request(f"{base_url}{api}{data_endpoint}?{query_params}", method="POST")

@@ -178,7 +178,7 @@ class leaderboard:
                 charset = response.headers.get_content_charset()
                 return json.loads(response.read().decode(charset or 'utf-8'))
         except Exception as e:
-            return f"An error occurred: {e}"
+            return {}
     @staticmethod
     def get_self_data():
         query_params = parse.urlencode({'name': username or leaderboard.get_user()})
@@ -187,7 +187,7 @@ class leaderboard:
                 charset = response.headers.get_content_charset()
                 return json.loads(response.read().decode(charset or 'utf-8'))
         except Exception as e:
-            return f"An error occurred: {e}"
+            return {}
     @staticmethod
     def update(value):
         query_params = parse.urlencode({'name': username or leaderboard.get_user(), 'value': value})
