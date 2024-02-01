@@ -3,7 +3,7 @@ from hand import Hand;         import time
 import leaderboard
 
 cooldown = 60
-user = leaderboard.get_user()
+user, auth = leaderboard.get_user()
 
 dealerHand = Hand()
 playerHands = [Hand()]
@@ -49,10 +49,11 @@ def get_bet():
     print
     while True:
         try:
-            bet = int(input(f"What's your bet (You have ${money})? "))
+            bet = float(input(f"What's your bet (You have ${money})? "))
         except:
             print("Not a valid number")
         else:
+            bet = round(bet*100)/100
             if bet > money:
                 print("Not enough money")
             elif bet <= 0:
@@ -61,6 +62,7 @@ def get_bet():
                 break
     clear()
     return bet
+
 def get_choice():
 
     choices = {"Hit": "h", "Stand": "s"}
@@ -258,9 +260,8 @@ if __name__ == "__main__":
                 result = playerHand.result or "Push" # default to draw
                 money += original_bet*results[result]
 
-            leaderboard.update(money)
+            print(leaderboard.update(money))
 
-            print()
             if len(playerHands) == 1:
                 print(f"{result}! You now have ${money}")
             else:

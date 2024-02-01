@@ -117,7 +117,7 @@ def get_self_data():
     except Exception as e:
         return {}
 def update(value):
-    query_params = parse.urlencode({'name': username or get_user(), 'value': value})
+    query_params = parse.urlencode({'name': username or get_user(), 'value': value, 'auth': auth})
     req = request.Request(f"{base_url}{api}{data_endpoint}?{query_params}", method="POST")
     try:
         with request.urlopen(req) as response:

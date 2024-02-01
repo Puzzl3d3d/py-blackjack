@@ -141,77 +141,138 @@ class Hand:
 # LEADERBOARD
 from urllib import request, parse
 import json
+import os
+import hashlib # auth
 
-# if you wanna bomb the api, add "jared_" before it (e.g. "/blackjack/jared_data") please :)
 base_url = "https://flask.puzzl3d.dev"
 api = "/blackjack"
+# if you wanna bomb the api, add "jared_" before it (e.g. "/blackjack/jared_data") please :)
 data_endpoint = "/data"
 top_endpoint = "/top"
+signup_endpoint = "/signup"
+updatePass_endpoint = "/update_password"
+exists_endpoint = "/user_exists"
+hasAuth_endpoint = "/has_auth"
 
 username = None
+auth = None
 
-class leaderboard:
-    @staticmethod
-    def get_user():
-        global username
-        if not os.path.exists("session"):
-            with open("session", "w") as file:
-                username = input("Username: ")
-                file.write(username)
-        else:
-            with open("session", "r") as file:
-                username = file.read().split("\n")[0].strip()
-        return username
-    @staticmethod
-    def get_top():
-        try:
-            with request.urlopen(f"{base_url}{api}{top_endpoint}") as response:
-                charset = response.headers.get_content_charset()
-                return json.loads(response.read().decode(charset or 'utf-8'))
-        except Exception as e:
-            print("ERROR |",e)
-            return {}
-    @staticmethod
-    def get_data():
-        try:
-            with request.urlopen(f"{base_url}{api}{data_endpoint}") as response:
-                charset = response.headers.get_content_charset()
-                return json.loads(response.read().decode(charset or 'utf-8'))
-        except Exception as e:
-            return {}
-    @staticmethod
-    def get_self_data():
-        query_params = parse.urlencode({'name': username or leaderboard.get_user()})
-        try:
-            with request.urlopen(f"{base_url}{api}{data_endpoint}?{query_params}") as response:
-                charset = response.headers.get_content_charset()
-                return json.loads(response.read().decode(charset or 'utf-8'))
-        except Exception as e:
-            return {}
-    @staticmethod
-    def update(value):
-        query_params = parse.urlencode({'name': username or leaderboard.get_user(), 'value': value})
-        req = request.Request(f"{base_url}{api}{data_endpoint}?{query_params}", method="POST")
-        try:
-            with request.urlopen(req) as response:
-                charset = response.headers.get_content_charset()
-                return response.read().decode(charset or 'utf-8')
-        except Exception as e:
-            return f"An error occurred: {e}"
-    @staticmethod
-    def ordinal_suffix(position):
-        position = int(position)
-        if 10 <= position % 100 <= 20:
-            suffix = 'th'
-        else:
-            suffixes = {1: 'st', 2: 'nd', 3: 'rd'}
-            suffix = suffixes.get(position % 10, 'th')
-        return f"{position}{suffix}"
+def hash(string):
+    return hashlib.sha256(string.encode('utf-8')).hexdigest()
+def has_auth(user):
+    query_params = parse.urlencode({'name': user})
+    try:
+        with request.urlopen(f"{base_url}{api}{hasAuth_endpoint}?{query_params}") as response:
+            charset = response.headers.get_content_charset()
+            return json.loads(response.read().decode(charset or 'utf-8')).get("auth")
+    except Exception as e:
+        return False
+def user_exists(user):
+    query_params = parse.urlencode({'name': user})
+    try:
+        with request.urlopen(f"{base_url}{api}{exists_endpoint}?{query_params}") as response:
+            charset = response.headers.get_content_charset()
+            return json.loads(response.read().decode(charset or 'utf-8')).get("exists")
+    except Exception as e:
+        return True
+def signup(user, auth):
+    query_params = parse.urlencode({'name': user, 'auth': auth})
+    req = request.Request(f"{base_url}{api}{signup_endpoint}?{query_params}", method="POST")
+    try:
+        with request.urlopen(req) as response:
+            charset = response.headers.get_content_charset()
+            return response.read().decode(charset or 'utf-8')
+    except Exception as e:
+        return f"An error occurred: {e}"
+def update_auth(user, old_auth, new_auth):
+    query_params = parse.urlencode({'name': user, 'auth': old_auth, "new": new_auth})
+    req = request.Request(f"{base_url}{api}{updatePass_endpoint}?{query_params}", method="POST")
+    try:
+        with request.urlopen(req) as response:
+            charset = response.headers.get_content_charset()
+            return response.read().decode(charset or 'utf-8')
+    except Exception as e:
+        return f"An error occurred: {e}"
+def read_user():
+    if not os.path.exists("session"): return None
+    with open("session", "r") as file:
+        username = file.read().split("\n")[0].strip()
+    return username
+def write_user(user):
+    with open("session", "w") as file:
+        file.write(user)
+def read_auth():
+    if not os.path.exists("auth"): return None
+    with open("auth", "r") as file:
+        auth = file.read().split("\n")[0].strip()
+    return auth
+def write_auth(auth):
+    with open("auth", "w") as file:
+        file.write(auth)
+def get_user():
+    global username
+    global auth
+
+    username = read_user() or input("Username: ")
+    auth = read_auth() or hash(input("Password: "))
+
+    write_user(username)
+    write_auth(auth)
+    
+    exists, auth_exists = user_exists(username), has_auth(username)
+    if exists and not auth_exists:
+        update_auth(username, None, auth)
+    elif not exists:
+        signup(username,auth)
+    
+    return username, auth
+def get_top():
+    try:
+        with request.urlopen(f"{base_url}{api}{top_endpoint}") as response:
+            charset = response.headers.get_content_charset()
+            return json.loads(response.read().decode(charset or 'utf-8'))
+    except Exception as e:
+        print("ERROR |",e)
+        return {}
+def get_data():
+    try:
+        with request.urlopen(f"{base_url}{api}{data_endpoint}") as response:
+            charset = response.headers.get_content_charset()
+            return json.loads(response.read().decode(charset or 'utf-8'))
+    except Exception as e:
+        return {}
+def get_self_data():
+    query_params = parse.urlencode({'name': username or get_user()})
+    try:
+        with request.urlopen(f"{base_url}{api}{data_endpoint}?{query_params}") as response:
+            charset = response.headers.get_content_charset()
+            return json.loads(response.read().decode(charset or 'utf-8'))
+    except Exception as e:
+        return {}
+def update(value):
+    query_params = parse.urlencode({'name': username or get_user(), 'value': value, 'auth': auth})
+    req = request.Request(f"{base_url}{api}{data_endpoint}?{query_params}", method="POST")
+    try:
+        with request.urlopen(req) as response:
+            charset = response.headers.get_content_charset()
+            return response.read().decode(charset or 'utf-8')
+    except Exception as e:
+        return f"An error occurred: {e}"
+def ordinal_suffix(position):
+    position = int(position)
+    if 10 <= position % 100 <= 20:
+        suffix = 'th'
+    else:
+        suffixes = {1: 'st', 2: 'nd', 3: 'rd'}
+        suffix = suffixes.get(position % 10, 'th')
+    return f"{position}{suffix}"
+
+# REST OF THE CODE
 
 import time
 
 cooldown = 60
-user = leaderboard.get_user()
+user = get_user()
 
 dealerHand = Hand()
 playerHands = [Hand()]
@@ -230,28 +291,28 @@ results = {
 def clear():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def get_top():
-    data = leaderboard.get_top() or {}
+def _get_top():
+    data = get_top() or {}
     name = data.get("name", "Nobody")
     value = data.get("value", 0)
     if money > value:
-        leaderboard.update(money)
+        update(money)
         name = user
         value = money
     return name, value
 def get_self_pos():
-    data = leaderboard.get_data()
+    data = get_data()
     sorted_data = sorted(data.keys(), key=lambda x: (-data[x].get("highest", 100), data[x].get("last_updated", 0)))
     try:
         position = sorted_data.index(user) + 1
-        print(f"Your position in the leaderboard is {leaderboard.ordinal_suffix(position)} with ${data.get(user, {}).get('highest', 100)}!")
+        print(f"Your position in the leaderboard is {ordinal_suffix(position)} with ${data.get(user, {}).get('highest', 100)}!")
     except:
         print(f"You aren't on the leaderboard yet!")
         return None, sorted_data
     return position, sorted_data
 
 def get_bet():
-    name,value = get_top()
+    name,value = _get_top()
     print(f"{name} is top of the leaderboard with ${value}!")
     get_self_pos()
     print
@@ -441,12 +502,12 @@ def doRound():
         playerHand.result = get_result(playerHand)
     
 if __name__ == "__main__":
-    data = leaderboard.get_self_data()
+    data = get_self_data()
     money = data.get("current", 100)
     delta = time.time() - data.get("last_updated", 0)
     if money == 0 and delta > cooldown:
         money = 100
-        leaderboard.update(money)
+        update(money)
     elif money == 0:
         while True:
             clear()
@@ -455,7 +516,7 @@ if __name__ == "__main__":
             else: print(f"You ran out of money! Play again in {round(cooldown-delta)} seconds")
             time.sleep(0.5)
         money = 100
-        leaderboard.update(money)
+        update(money)
 
     while True:
         while True:
@@ -466,7 +527,7 @@ if __name__ == "__main__":
                 result = playerHand.result or "Push" # default to draw
                 money += original_bet*results[result]
 
-            leaderboard.update(money)
+            update(money)
 
             print()
             if len(playerHands) == 1:
@@ -496,4 +557,4 @@ if __name__ == "__main__":
             else: print(f"{round(cooldown-delta)} seconds left!", end="")
             time.sleep(0.5)
         money = 100
-        leaderboard.update(money)
+        update(money)
